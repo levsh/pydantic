@@ -31,7 +31,7 @@ from .fields import MAPPING_LIKE_SHAPES, ModelField, ModelPrivateAttr, PrivateAt
 from .json import custom_pydantic_encoder, pydantic_encoder
 from .parse import Protocol, load_file, load_str_bytes
 from .schema import default_ref_template, model_schema
-from .types import PyObject, StrBytes
+from .types import PyObject, SecretBytes, SecretStr, StrBytes
 from .typing import (
     AnyCallable,
     get_args,
@@ -394,6 +394,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
+        show_secrets: bool = False,
     ) -> 'DictStrAny':
         """
         Generate a dictionary representation of the model, optionally specifying which fields to include or exclude.
@@ -415,6 +416,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
                 exclude_unset=exclude_unset,
                 exclude_defaults=exclude_defaults,
                 exclude_none=exclude_none,
+                show_secrets=show_secrets,
             )
         )
 
@@ -657,6 +659,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
         exclude_unset: bool,
         exclude_defaults: bool,
         exclude_none: bool,
+        show_secrets: bool,
     ) -> Any:
 
         if isinstance(v, BaseModel):
@@ -668,6 +671,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
                     include=include,
                     exclude=exclude,
                     exclude_none=exclude_none,
+                    show_secrets=show_secrets,
                 )
                 if ROOT_KEY in v_dict:
                     return v_dict[ROOT_KEY]
@@ -689,6 +693,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
                     include=value_include and value_include.for_element(k_),
                     exclude=value_exclude and value_exclude.for_element(k_),
                     exclude_none=exclude_none,
+                    show_secrets=show_secrets,
                 )
                 for k_, v_ in v.items()
                 if (not value_exclude or not value_exclude.is_excluded(k_))
@@ -706,6 +711,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
                     include=value_include and value_include.for_element(i),
                     exclude=value_exclude and value_exclude.for_element(i),
                     exclude_none=exclude_none,
+                    show_secrets=show_secrets,
                 )
                 for i, v_ in enumerate(v)
                 if (not value_exclude or not value_exclude.is_excluded(i))
@@ -716,6 +722,8 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
 
         elif isinstance(v, Enum) and getattr(cls.Config, 'use_enum_values', False):
             return v.value
+        elif isinstance(v, (SecretStr, SecretBytes)) and show_secrets:
+            return v.get_secret_value()
 
         else:
             return v
@@ -745,6 +753,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
+        show_secrets: bool = False,
     ) -> 'TupleGenerator':
 
         # Merge field set excludes with explicit exclude parameter with explicit overriding field set options.
@@ -790,6 +799,7 @@ class BaseModel(Representation, metaclass=ModelMetaclass):
                     exclude_unset=exclude_unset,
                     exclude_defaults=exclude_defaults,
                     exclude_none=exclude_none,
+                    show_secrets=show_secrets,
                 )
             yield dict_key, v
 

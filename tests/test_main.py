@@ -16,6 +16,8 @@ from pydantic import (
     Field,
     NoneBytes,
     NoneStr,
+    SecretBytes,
+    SecretStr,
     Required,
     ValidationError,
     constr,
@@ -2044,3 +2046,44 @@ def test_new_union_origin():
         'properties': {'x': {'title': 'X', 'anyOf': [{'type': 'integer'}, {'type': 'string'}]}},
         'required': ['x'],
     }
+
+
+def test_show_secrets():
+    class SubModel(BaseModel):
+        secret_str: SecretStr
+        secret_bytes: SecretBytes
+
+    class Model(BaseModel):
+        sub_model: SubModel
+        secret_str: SecretStr
+        secret_bytes: SecretBytes
+
+    model = Model(
+        sub_model=SubModel(secret_str="abc", secret_bytes=b"cba"),
+        secret_str="def",
+        secret_bytes=b"fed",
+    )
+
+    dct = model.dict()
+    assert isinstance(dct["sub_model"]["secret_str"], SecretStr)
+    assert isinstance(dct["sub_model"]["secret_bytes"], SecretBytes)
+    assert isinstance(dct["secret_str"], SecretStr)
+    assert isinstance(dct["secret_bytes"], SecretBytes)
+
+    dct = model.dict(show_secrets=None)
+    assert isinstance(dct["sub_model"]["secret_str"], SecretStr)
+    assert isinstance(dct["sub_model"]["secret_bytes"], SecretBytes)
+    assert isinstance(dct["secret_str"], SecretStr)
+    assert isinstance(dct["secret_bytes"], SecretBytes)
+
+    dct = model.dict(show_secrets=False)
+    assert isinstance(dct["sub_model"]["secret_str"], SecretStr)
+    assert isinstance(dct["sub_model"]["secret_bytes"], SecretBytes)
+    assert isinstance(dct["secret_str"], SecretStr)
+    assert isinstance(dct["secret_bytes"], SecretBytes)
+
+    dct = model.dict(show_secrets=True)
+    assert dct["sub_model"]["secret_str"] == "abc"
+    assert dct["sub_model"]["secret_bytes"] == b"cba"
+    assert dct["secret_str"] == "def"
+    assert dct["secret_bytes"] == b"fed"
